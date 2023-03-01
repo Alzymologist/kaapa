@@ -1,0 +1,31 @@
+[package]
+name = "kaapa"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+yew = { version = "0.20.0", features = ["csr"] }
+futures = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+jsonrpsee = { version = "0.16.2", features = ["wasm-client", "async-wasm-client"] }
+serde_json = { version = "1.0.81", features = ["preserve_order"] }
+hex = "0.4.3"
+frame-metadata = "15.0.0"
+parity-scale-codec = "3.1.5"
+scale-info = "2.3.1"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Headers",
+  "HtmlSelectElement",
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "Response",
+  "WebSocket",
+  "Window",
+]
