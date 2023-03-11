@@ -20,8 +20,12 @@ use yew::{
     AttrValue,
 };
 
-mod field;
-use field::FieldItem;
+mod field_content;
+mod messaging;
+use messaging::CallConstructorEvent;
+
+mod call_constructor;
+use call_constructor::CallConstructor;
 
 const ONE_SECOND: Duration = Duration::from_secs(1);
 
@@ -50,91 +54,20 @@ struct App {
     input: UnboundedSender<Request>,
     last_error: Vec<String>,
     last_block: String,
-    metadata: Vec<(u32, RuntimeMetadataV14)>,
-    pallet: Option<usize>,
-    call: Option<usize>,
+    metadata: Vec<RuntimeMetadataV14>,
+    construction: Option<CallConstructor>,
 }
 
 enum Msg {
     NewBlock(String),
-    PublishMetadata((u32, RuntimeMetadataV14)),
-    SelectPallet(usize),
-    SelectCall(usize),
+    PublishMetadata(RuntimeMetadataV14),
     PublishError(String),
+    CallConstructorEvent(CallConstructorEvent),
 }
 
 impl App {
     fn get_metadata(&self) -> Option<&RuntimeMetadataV14> {
-        match self.metadata.last() {
-            Some((_, a)) => Some(a),
-            None => None,
-        }
-    }
-
-    fn resolve_ty(&self, id: u32) -> Option<&Type<PortableForm>> {
-        match self.get_metadata() {
-            Some(a) => a.types.resolve(id),
-            None => None,
-        }
-    }
-
-    fn get_pallets(&self) -> Vec<PalletMetadata<PortableForm>> {
-        match self.get_metadata() {
-            Some(a) => a.pallets.clone(),
-            None => Vec::new(),
-        }
-    }
-
-    fn get_pallet(&self) -> Option<&PalletMetadata<PortableForm>> {
-        match self.get_metadata() {
-            Some(a) => match self.pallet {
-                Some(n) => match a.pallets.get(n) {
-                    Some(b) => Some(&b),
-                    None => None,
-                },
-                None => None,
-            },
-            None => None,
-        }
-    }
-
-    fn get_calls(&self) -> Vec<Variant<PortableForm>> {
-        match self.get_pallet() {
-            Some(a) => match a.calls {
-                Some(ref calls_def) => {
-                    let id = calls_def.ty.id();
-                    match self.resolve_ty(id) {
-                        Some(type_struct) => match type_struct.type_def() {
-                            TypeDef::Variant(calls) => calls.variants().to_vec(),
-                            _ => Vec::new(),
-                        },
-                        None => Vec::new(),
-                    }
-                }
-                None => Vec::new(),
-            },
-            None => Vec::new(),
-        }
-    }
-
-    fn get_call(&self) -> Option<Variant<PortableForm>> {
-        match self.call {
-            Some(n) => self.get_calls().get(n).cloned(),
-            None => None,
-        }
-    }
-
-    fn get_fields(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        match self.get_call() {
-            Some(call) => {
-                for call_field in call.fields() {
-                    self.resolve_ty(call_field.ty().id());
-                }
-            },
-            None => {},
-        };
-        out
+        self.metadata.last()
     }
 }
 
@@ -179,7 +112,7 @@ impl Component for App {
             } else {
                 panic!();
             };
-            publish_metadata.emit((0, metadata));
+            publish_metadata.emit(metadata);
             while let Some(request) = rx.next().await {
                 match request {
                     Request::GetBlock => {
@@ -216,8 +149,7 @@ impl Component for App {
             last_error: Vec::new(),
             last_block: "none".to_string(),
             metadata: Vec::new(),
-            pallet: None,
-            call: None,
+            construction: None::<CallConstructor>,
         }
     }
 
@@ -228,42 +160,28 @@ impl Component for App {
                 true
             }
             Msg::PublishMetadata(a) => {
-                self.metadata.push(a);
-                true
-            }
-            Msg::SelectPallet(n) => {
-                self.pallet = Some(n);
-                self.call = None;
-                true
-            }
-            Msg::SelectCall(n) => {
-                self.call = Some(n);
+                self.metadata.push(a.clone());
+                self.construction = Some(CallConstructor::new(a));
                 true
             }
             Msg::PublishError(e) => {
                 self.last_error.push(e);
                 true
             }
+            Msg::CallConstructorEvent(a) => match self.construction {
+                Some(ref mut b) => b.handle_event(a),
+                None => false,
+            },
         }
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
+        let cards = match self.construction {
+            Some(ref a) => a.get_cards(ctx.link().callback(Msg::CallConstructorEvent)),
+            None => Vec::new(),
+        };
+
         let errors = self.last_error.clone();
-        let pallets = self.get_pallets();
-        /*match self.metadata.last() {
-            Some((_, a)) => {
-                a.pallets.clone()//.iter().map(|p| p.name.to_string()).collect()
-            },
-            None => Vec::new()
-        };*/
-
-        let pallet_select_callback_event = ctx.link().callback(Msg::SelectPallet);
-
-        let pallet_select_callback = Callback::from(move |e: Event| {
-            let target: EventTarget = e.target().unwrap();
-            let item = target.unchecked_into::<HtmlSelectElement>().value();
-            pallet_select_callback_event.emit(item.parse::<usize>().unwrap());
-        });
 
         html! {
             <div>
@@ -272,98 +190,10 @@ impl Component for App {
                 <ul class = "item-list">
                     { errors.iter().collect::<Html>() }
                 </ul>
-                
-                //Select pallet
-                
-                <select onchange = {pallet_select_callback}>
-                    <option disabled = true selected = {self.pallet.is_none()} >{ "-" }</option>
-                    {
-                        pallets.iter().enumerate().map(|(n, p)| {
-                            html!{<option value = {n.to_string()}>{p.name.to_string()}</option>}
-                        }).collect::<Html>()
-                    }
-                </select>
 
-                //Select call
-                
-                {
-                    if self.pallet.is_some() {
-                        let calls = self.get_calls();
-                        let call_select_callback_event = ctx.link().callback(Msg::SelectCall);
-                        let call_select_callback = Callback::from(move |e: Event| {
-                            let target: EventTarget = e.target().unwrap();
-                            let item = target.unchecked_into::<HtmlSelectElement>().value();
-                            call_select_callback_event.emit(item.parse::<usize>().unwrap());
-                        });
-
-                        html! {
-                            <>
-                                <select onchange = {call_select_callback}>
-                                    <option disabled = true selected = {self.call.is_none()} >{ "-" }</option>
-                                    {
-                                        calls.iter().enumerate().map(|(n, p)| {
-                                            html!{<option value = {n.to_string()}>{p.name.to_string()}</option>}
-                                        }).collect::<Html>()
-                                    }
-                                </select>
-
-                                //Call parameters
-
-                                {
-                                    if let Some(this_call) = self.get_call() {
-                                        html! {
-                                            <>
-                                                <p>{this_call.docs().join("\n")}</p>
-                                                <ul class = "item-list">
-                                                {
-                                                    for this_call.fields().iter().map(|a| html!{
-                                                        <>
-                                                            <p>{a.name()}</p>
-                                                            {
-                                                                if let Some(field) =  self.resolve_ty(a.ty().id()) {
-                                                                    html!{
-                                                                        <>
-                                                                            //<FieldItem content = {poeben}/>
-                                                                            <p>{field.docs().join("\n")}</p>
-                                                                            {
-                                                                                match field.type_def() {
-                                                                                TypeDef::Composite(type_def_composite) => {
-                                                                                    if let Some(b) = type_def_composite.fields().first() {
-                                                                                        if let Some(t_field) = self.resolve_ty(b.ty().id()) {
-                                                                                            html!{
-                                                                                                <>
-                                                                                                    <p>{"composite"}</p>
-                                                                                                    <p>{format!("{:?}", t_field.type_def())}</p>
-                                                                                                </>
-                                                                                            }
-                                                                                        } else {html!{<p>{"lol"}</p>}}
-                                                                                    } else {html!{<p>{"notfound"}</p>}}
-                                                                                },
-                                                                                _ => html!{<p>{format!("{:?}", field.type_def())}</p>},
-                                                                                }
-                                                                            }
-                                                                        </>
-                                                                    }
-                                                                } else {
-                                                                    html!{<p>{"Field "}</p>}
-                                                                }
-                                                            }
-                                                        </>
-                                                    })
-                                                }
-                                                </ul>
-                                            </>
-                                        }
-                                    } else {
-                                        html!{<p>{"Select call"}</p>}
-                                    }
-                                }
-                            </>
-                        }   
-                    } else {
-                        html! {<p>{"Select palet"}</p>}
-                    }
-                }
+                <ul class = "item-list">
+                    { cards }
+                </ul>
             </div>
         }
     }
