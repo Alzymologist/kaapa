@@ -13,9 +13,11 @@ wasm-bindgen-futures = "0.4"
 jsonrpsee = { version = "0.16.2", features = ["wasm-client", "async-wasm-client"] }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 hex = "0.4.3"
-frame-metadata = "15.0.0"
+frame-metadata = {git = "https://github.com/paritytech/frame-metadata", rev = "1ea329920838b3f4170f421cde53ce7e6a15ccee", default-features = false, features = ["v14", "decode"]}
 parity-scale-codec = "3.1.5"
 scale-info = "2.3.1"
+sp-core = {version = "9.0.0", default-features = false}
+substrate_parser = {git = "https://github.com/Alzymologist/substrate-parser", default_features = false, features = ["plot_icon"]}
 
 [dependencies.web-sys]
 version = "0.3"

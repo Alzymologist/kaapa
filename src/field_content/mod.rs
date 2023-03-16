@@ -21,6 +21,9 @@ use yew::{
 pub mod pallet_call;
 use pallet_call::PalletCall;
 
+pub mod variant;
+use variant::VariantContent;
+
 pub mod composite;
 use composite::Composite;
 
@@ -32,7 +35,7 @@ use crate::messaging::{CallConstructorEvent, CCEI};
 #[derive(Debug)]
 pub enum FieldContent {
     PalletCall(PalletCall),
-    TypeDefVariant(TypeDefVariant<PortableForm>),
+    Variant(VariantContent),
     Composite(Composite),
     Sequence(Sequence),
     TypeDefArray(TypeDefArray<PortableForm>),
@@ -52,7 +55,7 @@ impl FieldContent {
     ) -> Self {
         match input {
             Some(a) => match a.type_def() {
-                TypeDef::Variant(b) => FieldContent::TypeDefVariant(b.to_owned()),
+                TypeDef::Variant(ref b) => FieldContent::Variant(VariantContent::resolve(b, metadata)),
                 TypeDef::Composite(ref b) => {
                     FieldContent::Composite(Composite::resolve(b, name, metadata))
                 }
@@ -72,18 +75,32 @@ impl FieldContent {
     pub fn handle_event(&mut self, ccei: CCEI, metadata: &RuntimeMetadataV14) -> bool {
         match self {
             FieldContent::PalletCall(ref mut a) => a.handle_event(ccei, metadata),
+            FieldContent::Variant(ref mut a) => a.handle_event(ccei, metadata),
+            FieldContent::Composite(_) => false,
+            FieldContent::Sequence(ref mut a) => a.handle_event(ccei, metadata),
+            FieldContent::TypeDefArray(ref a) => false,
+            FieldContent::TypeDefTuple(ref a) => false,
+            FieldContent::TypeDefPrimitive(ref a) => false,
+            FieldContent::TypeDefCompact(ref a) => false,
+            FieldContent::TypeDefBitSequence(ref a) => false,
             FieldContent::Stub(_) => false,
             FieldContent::Error(_) => false,
-            _ => false,
         }
     }
 
     pub fn get_child(&mut self, id: &usize) -> Option<&mut FieldContent> {
         match self {
             FieldContent::PalletCall(a) => a.get_child(id),
+            FieldContent::Variant(a) => a.get_child(id),
+            FieldContent::Composite(a) => a.get_child(id),
+            FieldContent::Sequence(a) => a.get_child(id),
+            FieldContent::TypeDefArray(a) => None,
+            FieldContent::TypeDefTuple(a) => None,
+            FieldContent::TypeDefPrimitive(a) => None,
+            FieldContent::TypeDefCompact(a) => None,
+            FieldContent::TypeDefBitSequence(a) => None,
             FieldContent::Stub(_) => None,
             FieldContent::Error(_) => None,
-            _ => None,
         }
     }
 
@@ -95,9 +112,26 @@ impl FieldContent {
     ) -> Vec<Html> {
         match self {
             FieldContent::PalletCall(ref a) => a.render(parent, callback_original, metadata),
+            FieldContent::Variant(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Composite(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Sequence(ref a) => a.render(parent, callback_original, metadata),
-            _ => vec![html! {<p>{format!("unhandled: {:?}", self)}</p>}], //TODO
+             _ => vec![html! {<p>{format!("unhandled: {:?}", self)}</p>}], //TODO
+        }
+    }
+
+    pub fn encoded(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        match self {
+            FieldContent::PalletCall(a) => a.encoded(metadata),
+            FieldContent::Variant(a) => a.encoded(metadata),
+            FieldContent::Composite(a) => a.encoded(metadata),
+            FieldContent::Sequence(a) => a.encoded(metadata),
+            FieldContent::TypeDefArray(a) => Vec::new(),
+            FieldContent::TypeDefTuple(a) => Vec::new(),
+            FieldContent::TypeDefPrimitive(a) => Vec::new(),
+            FieldContent::TypeDefCompact(a) => Vec::new(),
+            FieldContent::TypeDefBitSequence(a) => Vec::new(),
+            FieldContent::Stub(_) => Vec::new(),
+            FieldContent::Error(_) => Vec::new(),
         }
     }
 }
@@ -143,5 +177,20 @@ pub trait Field {
         out
     }
 
+    fn encoded_self(&self, metadata: &RuntimeMetadataV14) -> Vec<u8>;
+
+    fn encoded_children(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        let mut out = Vec::new();
+        for child in self.get_children().iter() {
+            out.append(&mut child.encoded(metadata));
+        }
+        out
+    }
+
+    fn encoded(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        let mut out = self.encoded_self(metadata);
+        out.append(&mut self.encoded_children(metadata));
+        out
+    }
 }
 

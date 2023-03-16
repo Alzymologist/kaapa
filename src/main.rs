@@ -3,9 +3,10 @@ use futures::{Stream, StreamExt};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::rpc_params;
 use jsonrpsee::wasm_client::WasmClientBuilder;
-use parity_scale_codec::Decode;
+use parity_scale_codec::{Decode, Encode};
 use scale_info::{form::PortableForm, Type, TypeDef, Variant};
 use serde_json::value::Value;
+use sp_core::H256;
 use std::time::Duration;
 use wasm_bindgen::JsCast;
 use web_sys::{EventTarget, HtmlSelectElement, WebSocket};
@@ -56,12 +57,14 @@ struct App {
     last_block: String,
     metadata: Vec<RuntimeMetadataV14>,
     construction: Option<CallConstructor>,
+    genesis_hash: Option<H256>
 }
 
 enum Msg {
     NewBlock(String),
     PublishMetadata(RuntimeMetadataV14),
     PublishError(String),
+    PublishGenesisHash(H256),
     CallConstructorEvent(CallConstructorEvent),
 }
 
@@ -149,6 +152,7 @@ impl Component for App {
             last_error: Vec::new(),
             last_block: "none".to_string(),
             metadata: Vec::new(),
+            genesis_hash: None,
             construction: None::<CallConstructor>,
         }
     }
@@ -158,16 +162,20 @@ impl Component for App {
             Msg::NewBlock(a) => {
                 self.last_block = a;
                 true
-            }
+            },
             Msg::PublishMetadata(a) => {
                 self.metadata.push(a.clone());
                 self.construction = Some(CallConstructor::new(a));
                 true
-            }
+            },
+            Msg::PublishGenesisHash(a) => {
+                self.genesis_hash = Some(a);
+                true
+            },
             Msg::PublishError(e) => {
                 self.last_error.push(e);
                 true
-            }
+            },
             Msg::CallConstructorEvent(a) => match self.construction {
                 Some(ref mut b) => b.handle_event(a),
                 None => false,
@@ -180,6 +188,22 @@ impl Component for App {
             Some(ref a) => a.get_cards(ctx.link().callback(Msg::CallConstructorEvent)),
             None => Vec::new(),
         };
+
+        let encoded = match self.construction {
+            Some(ref a) => a.encoded(),
+            None => Vec::new(),
+        };
+
+        let mut parsed_cards = Vec::new();
+        if let Some(metadata) = self.metadata.last() {
+            let mut compacted = (encoded.len() as u32).encode();
+            compacted.append(&mut encoded.clone());
+            if let Ok(a) = &substrate_parser::MarkedData::mark(&encoded.encode()) {
+                if let Ok(parsed) = substrate_parser::decode_as_call(a, metadata) {
+                    parsed_cards = parsed.card(0, &substrate_parser::ShortSpecs{base58prefix: 0, decimals: 1, name: "lolname".to_string(), unit: "huyunit".to_string()});
+                }
+            }
+        }
 
         let errors = self.last_error.clone();
 
@@ -194,6 +218,22 @@ impl Component for App {
                 <ul class = "item-list">
                     { cards }
                 </ul>
+                <p>{"did you mean this?"}</p>
+                <p>{hex::encode(encoded.clone())}</p>
+                <ul class = "item-list">
+                    { parsed_cards.iter().map(|a| html!{<p>{format!("{}\n", a.show())}</p>}).collect::<Html>() }
+                </ul>
+
+                <p>{"DEBUG AREA"}</p>
+                {
+                    if let Some(metadata) = self.metadata.last() {
+                html!{
+                    <>
+                        <p>{format!("{:?}", metadata.extrinsic)}</p>
+                        <p>{format!("{:?}", metadata.types.resolve(metadata.extrinsic.ty.id()))}</p>
+                    </>}
+                    } else {html!{}}
+                }
             </div>
         }
     }

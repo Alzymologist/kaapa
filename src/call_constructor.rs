@@ -56,4 +56,8 @@ impl CallConstructor {
         field.handle_event(event.ccei, &self.metadata);
         true
     }
+
+    pub fn encoded(&self) -> Vec<u8> {
+        self.content.encoded(&self.metadata)
+    }
 }

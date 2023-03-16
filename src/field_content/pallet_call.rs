@@ -199,4 +199,15 @@ impl Field for PalletCall {
             </>
         }
     }
+
+    fn encoded_self(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        let mut out = Vec::new();
+        if let Some(ref a) = self.pallet {
+            if let Some(ref b) = self.call {
+                out.push(a.index);
+                out.push(b.index);
+            }
+        }
+        out
+    }
 }

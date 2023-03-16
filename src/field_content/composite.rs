@@ -55,6 +55,11 @@ impl Composite {
     pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|x| &**x)
     }
+
+    pub fn get_child(&mut self, id: &usize) -> Option<&mut FieldContent> {
+        self.fields.get_mut(*id)
+    }
+
 }
 
 impl Field for Composite {
@@ -77,5 +82,10 @@ impl Field for Composite {
                 Some(name) => html! {<p>{format!("{}", name)}</p>},
                 None => html! {},
             }
+    }
+
+    
+    fn encoded_self(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        Vec::new()
     }
 }
