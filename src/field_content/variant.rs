@@ -23,14 +23,20 @@ use crate::messaging::{CallConstructorEvent, CCEI};
 
 #[derive(Debug)]
 pub struct VariantContent {
+    name: Option<String>,
     variants: Vec<Variant<PortableForm>>,
     selected: Option<Variant<PortableForm>>,
     fields: Vec<FieldContent>,
 }
 
 impl VariantContent {
-    pub fn resolve(input: &TypeDefVariant<PortableForm>, metadata: &RuntimeMetadataV14) -> Self {
+    pub fn resolve(input: &TypeDefVariant<PortableForm>, name: Option<&str>, metadata: &RuntimeMetadataV14) -> Self {
+        let name = match name {
+            Some(a) => Some(a.to_string()),
+            None => None,
+        };
         VariantContent {
+            name: name,
             variants: input.variants().to_vec(),
             selected: None,
             fields: Vec::new(),
@@ -44,6 +50,13 @@ impl VariantContent {
                 self.fields = variant.fields.iter().map(|a| {FieldContent::new(metadata.types.resolve(a.ty().id()), a.name().map(|x| &**x), metadata)}).collect();
                 break;
             }
+        }
+    }
+
+    pub fn name(&self) -> String {
+        match &self.name {
+            Some(a) => a.to_string(),
+            None => String::new(),
         }
     }
 
@@ -84,6 +97,7 @@ impl Field for VariantContent {
 
         html! {
             <>
+                <p>{self.name()}</p>
                 <select onchange = {select_callback}>
                     <option disabled = true selected = {self.selected.is_none()} >{ "-" }</option>
                     {

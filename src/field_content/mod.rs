@@ -30,6 +30,12 @@ use composite::Composite;
 pub mod sequence;
 use sequence::Sequence;
 
+pub mod compact;
+use compact::Compact;
+
+pub mod magic_unchecked_extrinsic;
+use magic_unchecked_extrinsic::MagicUncheckedExtrinsic;
+
 use crate::messaging::{CallConstructorEvent, CCEI};
 
 #[derive(Debug)]
@@ -41,10 +47,11 @@ pub enum FieldContent {
     TypeDefArray(TypeDefArray<PortableForm>),
     TypeDefTuple(TypeDefTuple<PortableForm>),
     TypeDefPrimitive(TypeDefPrimitive),
-    TypeDefCompact(TypeDefCompact<PortableForm>),
+    Compact(Compact),
     TypeDefBitSequence(TypeDefBitSequence<PortableForm>),
     Stub(Type<PortableForm>),
     Error(String),
+    MagicUncheckedExtrinsic(MagicUncheckedExtrinsic),
 }
 
 impl FieldContent {
@@ -55,7 +62,7 @@ impl FieldContent {
     ) -> Self {
         match input {
             Some(a) => match a.type_def() {
-                TypeDef::Variant(ref b) => FieldContent::Variant(VariantContent::resolve(b, metadata)),
+                TypeDef::Variant(ref b) => FieldContent::Variant(VariantContent::resolve(b, name, metadata)),
                 TypeDef::Composite(ref b) => {
                     FieldContent::Composite(Composite::resolve(b, name, metadata))
                 }
@@ -65,7 +72,7 @@ impl FieldContent {
                 TypeDef::Array(b) => FieldContent::TypeDefArray(b.to_owned()),
                 TypeDef::Tuple(b) => FieldContent::TypeDefTuple(b.to_owned()),
                 TypeDef::Primitive(b) => FieldContent::TypeDefPrimitive(b.to_owned()),
-                TypeDef::Compact(b) => FieldContent::TypeDefCompact(b.to_owned()),
+                TypeDef::Compact(b) => Compact::resolve(b, name, metadata),
                 TypeDef::BitSequence(b) => FieldContent::TypeDefBitSequence(b.to_owned()),
             },
             None => FieldContent::Error("type not found".to_owned()),
@@ -81,10 +88,11 @@ impl FieldContent {
             FieldContent::TypeDefArray(ref a) => false,
             FieldContent::TypeDefTuple(ref a) => false,
             FieldContent::TypeDefPrimitive(ref a) => false,
-            FieldContent::TypeDefCompact(ref a) => false,
+            FieldContent::Compact(ref a) => false,
             FieldContent::TypeDefBitSequence(ref a) => false,
             FieldContent::Stub(_) => false,
             FieldContent::Error(_) => false,
+            FieldContent::MagicUncheckedExtrinsic(_) => false,
         }
     }
 
@@ -97,10 +105,11 @@ impl FieldContent {
             FieldContent::TypeDefArray(a) => None,
             FieldContent::TypeDefTuple(a) => None,
             FieldContent::TypeDefPrimitive(a) => None,
-            FieldContent::TypeDefCompact(a) => None,
+            FieldContent::Compact(a) => None,
             FieldContent::TypeDefBitSequence(a) => None,
             FieldContent::Stub(_) => None,
             FieldContent::Error(_) => None,
+            FieldContent::MagicUncheckedExtrinsic(a) => a.get_child(id),
         }
     }
 
@@ -115,6 +124,7 @@ impl FieldContent {
             FieldContent::Variant(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Composite(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Sequence(ref a) => a.render(parent, callback_original, metadata),
+            FieldContent::MagicUncheckedExtrinsic(ref a) => a.render(parent, callback_original, metadata),
              _ => vec![html! {<p>{format!("unhandled: {:?}", self)}</p>}], //TODO
         }
     }
@@ -128,10 +138,11 @@ impl FieldContent {
             FieldContent::TypeDefArray(a) => Vec::new(),
             FieldContent::TypeDefTuple(a) => Vec::new(),
             FieldContent::TypeDefPrimitive(a) => Vec::new(),
-            FieldContent::TypeDefCompact(a) => Vec::new(),
+            FieldContent::Compact(a) => Vec::new(),
             FieldContent::TypeDefBitSequence(a) => Vec::new(),
             FieldContent::Stub(_) => Vec::new(),
             FieldContent::Error(_) => Vec::new(),
+            FieldContent::MagicUncheckedExtrinsic(a) => a.encoded(metadata),
         }
     }
 }

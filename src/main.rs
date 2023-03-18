@@ -28,6 +28,8 @@ use messaging::CallConstructorEvent;
 mod call_constructor;
 use call_constructor::CallConstructor;
 
+mod extensions;
+
 const ONE_SECOND: Duration = Duration::from_secs(1);
 
 pub fn unhex(hex_input: &str) -> Vec<u8> {
@@ -189,23 +191,50 @@ impl Component for App {
             None => Vec::new(),
         };
 
+        let extension_cards = match self.construction {
+            Some(ref a) => a.get_extension_cards(ctx.link().callback(Msg::CallConstructorEvent)),
+            None => Vec::new(),
+        };
+
+        let extension_additional_cards = match self.construction {
+            Some(ref a) => a.get_extension_additional_cards(ctx.link().callback(Msg::CallConstructorEvent)),
+            None => Vec::new(),
+        };
+
+
         let encoded = match self.construction {
             Some(ref a) => a.encoded(),
             None => Vec::new(),
         };
+        let encoded_call = match self.construction {
+            Some(ref a) => a.encoded_call(),
+            None => Vec::new(),
+        };
+
 
         let mut parsed_cards = Vec::new();
         if let Some(metadata) = self.metadata.last() {
-            let mut compacted = (encoded.len() as u32).encode();
-            compacted.append(&mut encoded.clone());
-            if let Ok(a) = &substrate_parser::MarkedData::mark(&encoded.encode()) {
+            if let Ok(a) = &substrate_parser::MarkedData::mark(&encoded_call) {
                 if let Ok(parsed) = substrate_parser::decode_as_call(a, metadata) {
                     parsed_cards = parsed.card(0, &substrate_parser::ShortSpecs{base58prefix: 0, decimals: 1, name: "lolname".to_string(), unit: "huyunit".to_string()});
                 }
             }
         }
+    
+        let mut parsed_ext_cards = Vec::new();
+        if let Some(metadata) = self.metadata.last() {
+            if let Ok(a) = &substrate_parser::MarkedData::mark(&encoded) {
+                if let Ok(parsed) = substrate_parser::unchecked_extrinsic::decode_as_unchecked_extrinsic(&encoded, metadata) {
+                    parsed_ext_cards = match parsed {
+                        substrate_parser::unchecked_extrinsic::UncheckedExtrinsic::Signed{address: _, signature: _, extra: _, call: a} => a.card(0, &substrate_parser::ShortSpecs{base58prefix: 0, decimals: 1, name: "lolname".to_string(), unit: "huyunit".to_string()}),
+                        substrate_parser::unchecked_extrinsic::UncheckedExtrinsic::Unsigned{call: a} => a.card(0, &substrate_parser::ShortSpecs{base58prefix: 0, decimals: 1, name: "lolname".to_string(), unit: "huyunit".to_string()}),
+                    }
+                }
+            }
+        }
 
         let errors = self.last_error.clone();
+                    let queried = 6;
 
         html! {
             <div>
@@ -215,13 +244,27 @@ impl Component for App {
                     { errors.iter().collect::<Html>() }
                 </ul>
 
+                <p>{"CALL:"}</p>
                 <ul class = "item-list">
                     { cards }
                 </ul>
+                <p>{"EXTENSIONS:"}</p>
+                <ul class = "item-list">
+                    { extension_cards }
+                </ul>
+                <p>{"EXTENSIONS ADDITIONAL:"}</p>
+                <ul class = "item-list">
+                    { extension_additional_cards }
+                </ul>
                 <p>{"did you mean this?"}</p>
                 <p>{hex::encode(encoded.clone())}</p>
+                <p>{"AS CALL"}</p>
                 <ul class = "item-list">
                     { parsed_cards.iter().map(|a| html!{<p>{format!("{}\n", a.show())}</p>}).collect::<Html>() }
+                </ul>
+                <p>{"AS EXTRINSIC"}</p>
+                <ul class = "item-list">
+                    { parsed_ext_cards.iter().map(|a| html!{<p>{format!("{}\n", a.show())}</p>}).collect::<Html>() }
                 </ul>
 
                 <p>{"DEBUG AREA"}</p>
@@ -230,7 +273,7 @@ impl Component for App {
                 html!{
                     <>
                         <p>{format!("{:?}", metadata.extrinsic)}</p>
-                        <p>{format!("{:?}", metadata.types.resolve(metadata.extrinsic.ty.id()))}</p>
+                        <p>{format!("type {} is {:?}", queried, metadata.types.resolve(queried))}</p>
                     </>}
                     } else {html!{}}
                 }
