@@ -23,6 +23,7 @@ use crate::messaging::{CallConstructorEvent, CCEI};
 #[derive(Debug)]
 pub struct Composite {
     name: Option<String>,
+    compact: bool, // TODO: this is useless probably
     fields: Vec<FieldContent>,
 }
 
@@ -30,6 +31,7 @@ impl Composite {
     pub fn resolve(
         input: &TypeDefComposite<PortableForm>,
         name: Option<&str>,
+        compact: bool,
         metadata: &RuntimeMetadataV14,
     ) -> Self {
         let name = match name {
@@ -38,6 +40,7 @@ impl Composite {
         };
         Composite {
             name: name,
+            compact: compact,
             fields: input
                 .fields()
                 .iter()
@@ -45,6 +48,7 @@ impl Composite {
                     FieldContent::new(
                         metadata.types.resolve(a.ty().id()),
                         a.name().map(|x| &**x),
+                        false,
                         metadata,
                     )
                 })

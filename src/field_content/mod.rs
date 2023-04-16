@@ -18,6 +18,8 @@ use yew::{
     AttrValue, Callback,
 };
 
+mod components;
+
 pub mod pallet_call;
 use pallet_call::PalletCall;
 
@@ -30,8 +32,8 @@ use composite::Composite;
 pub mod sequence;
 use sequence::Sequence;
 
-pub mod compact;
-use compact::Compact;
+pub mod primitive;
+use primitive::Primitive;
 
 pub mod magic_unchecked_extrinsic;
 use magic_unchecked_extrinsic::MagicUncheckedExtrinsic;
@@ -46,8 +48,7 @@ pub enum FieldContent {
     Sequence(Sequence),
     TypeDefArray(TypeDefArray<PortableForm>),
     TypeDefTuple(TypeDefTuple<PortableForm>),
-    TypeDefPrimitive(TypeDefPrimitive),
-    Compact(Compact),
+    Primitive(Primitive),
     TypeDefBitSequence(TypeDefBitSequence<PortableForm>),
     Stub(Type<PortableForm>),
     Error(String),
@@ -58,21 +59,22 @@ impl FieldContent {
     pub fn new(
         input: Option<&Type<PortableForm>>,
         name: Option<&str>,
+        compact: bool,
         metadata: &RuntimeMetadataV14,
     ) -> Self {
         match input {
             Some(a) => match a.type_def() {
-                TypeDef::Variant(ref b) => FieldContent::Variant(VariantContent::resolve(b, name, metadata)),
+                TypeDef::Variant(ref b) => FieldContent::Variant(VariantContent::resolve(b, name, compact, metadata)),
                 TypeDef::Composite(ref b) => {
-                    FieldContent::Composite(Composite::resolve(b, name, metadata))
+                    FieldContent::Composite(Composite::resolve(b, name, compact, metadata))
                 }
                 TypeDef::Sequence(b) => {
-                    FieldContent::Sequence(Sequence::resolve(b, name, metadata))
+                    FieldContent::Sequence(Sequence::resolve(b, name, compact, metadata))
                 }
                 TypeDef::Array(b) => FieldContent::TypeDefArray(b.to_owned()),
                 TypeDef::Tuple(b) => FieldContent::TypeDefTuple(b.to_owned()),
-                TypeDef::Primitive(b) => FieldContent::TypeDefPrimitive(b.to_owned()),
-                TypeDef::Compact(b) => Compact::resolve(b, name, metadata),
+                TypeDef::Primitive(ref b) => FieldContent::Primitive(Primitive::resolve(b, name, compact, metadata)),
+                TypeDef::Compact(b) => FieldContent::new(metadata.types.resolve(b.type_param().id()), name, true, metadata),
                 TypeDef::BitSequence(b) => FieldContent::TypeDefBitSequence(b.to_owned()),
             },
             None => FieldContent::Error("type not found".to_owned()),
@@ -87,8 +89,7 @@ impl FieldContent {
             FieldContent::Sequence(ref mut a) => a.handle_event(ccei, metadata),
             FieldContent::TypeDefArray(ref a) => false,
             FieldContent::TypeDefTuple(ref a) => false,
-            FieldContent::TypeDefPrimitive(ref a) => false,
-            FieldContent::Compact(ref a) => false,
+            FieldContent::Primitive(ref a) => false,
             FieldContent::TypeDefBitSequence(ref a) => false,
             FieldContent::Stub(_) => false,
             FieldContent::Error(_) => false,
@@ -104,8 +105,7 @@ impl FieldContent {
             FieldContent::Sequence(a) => a.get_child(id),
             FieldContent::TypeDefArray(a) => None,
             FieldContent::TypeDefTuple(a) => None,
-            FieldContent::TypeDefPrimitive(a) => None,
-            FieldContent::Compact(a) => None,
+            FieldContent::Primitive(a) => None,
             FieldContent::TypeDefBitSequence(a) => None,
             FieldContent::Stub(_) => None,
             FieldContent::Error(_) => None,
@@ -124,6 +124,7 @@ impl FieldContent {
             FieldContent::Variant(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Composite(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::Sequence(ref a) => a.render(parent, callback_original, metadata),
+            FieldContent::Primitive(ref a) => a.render(parent, callback_original, metadata),
             FieldContent::MagicUncheckedExtrinsic(ref a) => a.render(parent, callback_original, metadata),
              _ => vec![html! {<p>{format!("unhandled: {:?}", self)}</p>}], //TODO
         }
@@ -137,8 +138,7 @@ impl FieldContent {
             FieldContent::Sequence(a) => a.encoded(metadata),
             FieldContent::TypeDefArray(a) => Vec::new(),
             FieldContent::TypeDefTuple(a) => Vec::new(),
-            FieldContent::TypeDefPrimitive(a) => Vec::new(),
-            FieldContent::Compact(a) => Vec::new(),
+            FieldContent::Primitive(a) => a.encoded(metadata),
             FieldContent::TypeDefBitSequence(a) => Vec::new(),
             FieldContent::Stub(_) => Vec::new(),
             FieldContent::Error(_) => Vec::new(),

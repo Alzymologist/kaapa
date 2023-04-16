@@ -15,8 +15,8 @@ impl ExtensionContent {
     pub fn new(input: &SignedExtensionMetadata<PortableForm>, metadata: &RuntimeMetadataV14) -> Self {
         ExtensionContent {
             identifier: input.identifier.clone(),
-            content: FieldContent::new(metadata.types.resolve(input.ty.id()), Some(&input.identifier), metadata),
-            additional: FieldContent::new(metadata.types.resolve(input.additional_signed.id()), Some(&input.identifier), metadata),
+            content: FieldContent::new(metadata.types.resolve(input.ty.id()), Some(&input.identifier), false, metadata),
+            additional: FieldContent::new(metadata.types.resolve(input.additional_signed.id()), Some(&input.identifier), false, metadata),
         }
     }
 
@@ -36,5 +36,13 @@ impl ExtensionContent {
 
     pub fn additional(&mut self) -> &mut FieldContent {
         &mut self.content
+    }
+
+    pub fn encoded_content(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        self.content.encoded(metadata)
+    }
+
+    pub fn encoded_additional(&self, metadata: &RuntimeMetadataV14) -> Vec<u8> {
+        self.additional.encoded(metadata)
     }
 }

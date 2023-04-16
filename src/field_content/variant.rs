@@ -24,19 +24,21 @@ use crate::messaging::{CallConstructorEvent, CCEI};
 #[derive(Debug)]
 pub struct VariantContent {
     name: Option<String>,
+    compact: bool, //useless, maybe remove? variant is always compact.
     variants: Vec<Variant<PortableForm>>,
     selected: Option<Variant<PortableForm>>,
     fields: Vec<FieldContent>,
 }
 
 impl VariantContent {
-    pub fn resolve(input: &TypeDefVariant<PortableForm>, name: Option<&str>, metadata: &RuntimeMetadataV14) -> Self {
+    pub fn resolve(input: &TypeDefVariant<PortableForm>, name: Option<&str>, compact: bool, metadata: &RuntimeMetadataV14) -> Self {
         let name = match name {
             Some(a) => Some(a.to_string()),
             None => None,
         };
         VariantContent {
             name: name,
+            compact: compact,
             variants: input.variants().to_vec(),
             selected: None,
             fields: Vec::new(),
@@ -47,7 +49,7 @@ impl VariantContent {
         for variant in self.variants.iter() {
             if variant.index() == index {
                 self.selected = Some(variant.clone());
-                self.fields = variant.fields.iter().map(|a| {FieldContent::new(metadata.types.resolve(a.ty().id()), a.name().map(|x| &**x), metadata)}).collect();
+                self.fields = variant.fields.iter().map(|a| {FieldContent::new(metadata.types.resolve(a.ty().id()), a.name().map(|x| &**x), false, metadata)}).collect();
                 break;
             }
         }

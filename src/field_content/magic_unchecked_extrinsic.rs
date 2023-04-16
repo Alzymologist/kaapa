@@ -46,6 +46,7 @@ impl MagicUncheckedExtrinsic {
                         call = FieldContent::new(
                             metadata.types.resolve(b.id()),
                             Some("Call"),
+                            false,
                             metadata
                         );
                         break;

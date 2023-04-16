@@ -210,6 +210,10 @@ impl Component for App {
             Some(ref a) => a.encoded_call(),
             None => Vec::new(),
         };
+        let encoded_ext = match self.construction {
+            Some(ref a) => a.encoded_extensions(),
+            None => Vec::new(),
+        };
 
 
         let mut parsed_cards = Vec::new();
@@ -258,6 +262,8 @@ impl Component for App {
                 </ul>
                 <p>{"did you mean this?"}</p>
                 <p>{hex::encode(encoded.clone())}</p>
+                <p>{"extensions:"}</p>
+                <p>{encoded_ext}</p>
                 <p>{"AS CALL"}</p>
                 <ul class = "item-list">
                     { parsed_cards.iter().map(|a| html!{<p>{format!("{}\n", a.show())}</p>}).collect::<Html>() }

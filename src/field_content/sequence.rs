@@ -25,6 +25,7 @@ use crate::messaging::{CallConstructorEvent, CCEI};
 #[derive(Debug)]
 pub struct Sequence {
     name: Option<String>,
+    compact: bool,
     content: SequenceType,
 }
 
@@ -79,6 +80,8 @@ impl Sequence {
     pub fn resolve(
         input: &TypeDefSequence<PortableForm>,
         name: Option<&str>,
+        compact: bool, // TODO this should be useless, as sequences are always compact and inner
+                       // values take care of themselves
         metadata: &RuntimeMetadataV14,
     ) -> Self {
         let name = match name {
@@ -100,6 +103,7 @@ impl Sequence {
             };
             Sequence {
                 name: name,
+                compact: compact,
                 content: content,
             }
         } else {

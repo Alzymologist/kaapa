@@ -90,6 +90,7 @@ impl PalletCall {
                             FieldContent::new(
                                 metadata.types.resolve(a.ty().id()),
                                 a.name().map(|x| &**x),
+                                false,
                                 metadata,
                             )
                         })

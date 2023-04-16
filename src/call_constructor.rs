@@ -113,4 +113,15 @@ impl CallConstructor {
             Vec::new()
         }
     }
+
+    pub fn encoded_extensions(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        for extension in self.extensions.iter() {
+            out.append(&mut (extension.encoded_content(&self.metadata)));
+        }
+        for extension in self.extensions.iter() {
+            out.append(&mut extension.encoded_additional(&self.metadata));
+        }
+        out
+    }
 }
